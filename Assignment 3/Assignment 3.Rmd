@@ -1,0 +1,120 @@
+---
+title: "FML Assignment 3"
+author: "Nikitha Chigurupati"
+date: "2022-10-16"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+#IMPORTING THE DATASET
+```{r}
+Df <- read.csv("C:/Users/Nikitha/Downloads/UniversalBank.csv")
+```
+
+#CONVERTING THE PREDICTOR ATTRIBUTE TO FACTORS
+```{r}
+Df$Personal.Loan <- as.factor(Df$Personal.Loan)
+Df$Online <- as.factor(Df$Online)
+Df$CreditCard <- as.factor(Df$CreditCard)
+```
+
+#CHECKING FOR NULL VALUES
+```{r}
+sum(is.na(Df))
+```
+
+#LOADING THE LIBRARIES
+```{r}
+library(class)
+library(caret)
+library(e1071)
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(melt)
+library(ISLR)
+library(reshape2)
+library(readr)
+library(naivebayes)
+library(pROC)
+```
+
+#DATA PARTITION TO 60:40
+```{r}
+set.seed(123)
+datapart <- createDataPartition(Df$Personal.Loan,p=.6, list=F)
+Train <- Df[datapart,]
+Validate <- Df[-datapart,]
+```
+
+#DATA NORMALIZATION
+```{r}
+norm_model <- preProcess(Train[,-c(10,13:14)], 
+                method=c("center","scale"))
+Train_norm <- predict(norm_model,Train)
+Validate_norm <- predict(norm_model,Validate)
+```
+
+#A. Create a pivot table for the training data with Online as a column variable, CC as a row variable, and Loan as a secondary row variable
+```{r}
+tab1<- ftable(Train_norm[,c(14,10,13)])
+tab1
+```
+
+#B. This is the probability of loan acceptance (Loan = 1) conditional on having a bank credit card (CC = 1) and being an active user of online banking services (Online = 1)] = 51/(51+467) = 0.0984.
+
+#C. Creating two separate pivot tables for the training data. One having Loan (rows) as a function of Online (columns) and the other having Loan (rows) as a function of CC
+```{r}
+melt1 = melt(Train, id=c("CreditCard","Personal.Loan"), variable = "Online")
+castbank = dcast(melt1, CreditCard+Personal.Loan~Online)
+castbank[,c(1:2,14)] 
+```
+
+#D.Compute the following quantities [P(A | B) i.e. the probability of A given B]
+```{r}
+ftable(Train_norm[,c(10,13)])
+```
+
+```{r}
+ftable(Train_norm[,c(10,14)])
+```
+
+```{r}
+ftable(Train_norm[,10])
+```
+
+#1. P(CC = 1 | Loan = 1) = (84/84+204) = 0.291
+#2. P(Online = 1 | Loan = 1)  = (176/176+112) = 0.611
+#3. P(Loan = 1) = (288/288+2712) = 0.096
+#4. P(CC = 1 | Loan = 0) = (777/777+1935) = 0.286
+#5. P(Online = 1 | Loan = 0) = (1611/ 1611+1101) = 0.595
+#6. P(Loan = 0) = (2712/ 2712+288) = 0.904
+
+#E. Use the quantities computed above to compute the naive Bayes probability P(Loan = 1 | CC = 1, Online = 1)
+```{r}
+#(0.291 x 0.611 x 0.096) / (0.271 x 0.611 x 0.096) + (0.286 x 0.595 x 0.904) = 0.1000
+```
+
+#F. We can see that the values attained in steps b, 0.0984, and a, 0.1000, are practically identical, although the probability with Naive Bayes is slightly higher.
+
+#G. Run the Naive Bayes Model on the data
+```{r}
+Naive <- naive_bayes(Personal.Loan~Online+CreditCard,data=Train_norm)
+Naive
+#Naive Bayes Model results for the consumer taking the loan, using their credit card, and using online banking are 0.1000, which is equivalent to the result in E.
+```
+
+#Examining the AUC value and ROC curve
+```{r}
+Naive <- naiveBayes(Personal.Loan~Online+CreditCard,data=Train_norm)
+Naive
+
+predlab <- predict(Naive,Validate_norm,type = "raw")
+head(predlab)
+roc(Validate_norm$Online,predlab[,2])
+plot.roc(Validate_norm$Online,predlab[,2])
+
+```
+
+
