@@ -1,0 +1,166 @@
+---
+title: "Assignment - 5"
+author: "Nikitha Chigurupati"
+date: "11/30/2022"
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+#Loading the Packages 
+library(cluster)
+library(dplyr)
+library(caret)
+library(dendextend)
+library(knitr)
+library(factoextra)
+library(readr)
+```
+
+```{r}
+#Importing the dataset
+Cereals <- read.csv("C:/Users/Nikitha/Downloads/Cereals.csv")
+head(Cereals)
+dim(Cereals)
+```
+
+```{r}
+#Omitting the NUll values
+Cereals <- na.omit(Cereals)
+dim(Cereals)
+head(Cereals)
+```
+
+```{r}
+#Creating a dataset with the Numeric Values
+Cereals_Num<- data.frame(Cereals[,4:16])
+Cereals_Num <- na.omit(Cereals_Num)
+```
+
+```{r}
+#Normalizing the data
+Cereals_norm <- scale(Cereals_Num)
+head(Cereals_norm)
+```
+
+```{r}
+#Applying hierarchical clustering using Euclidean distance method.
+dist <- dist(Cereals_norm, method= "euclidean")
+Hist_clust <- hclust(dist, method = "complete")
+```
+
+```{r}
+#Plotting of the dendogram
+plot(Hist_clust, cex = 0.7, hang = -1)
+```
+
+```{r}
+#Using Agnes function to perform clustering with single linkage, complete linkage average linkage and Ward.
+hc_single <- agnes(Cereals_norm, method = "single")
+hc_complete <- agnes(Cereals_norm, method = "complete")
+hc_average <- agnes(Cereals_norm, method = "average")
+hc_ward <- agnes(Cereals_norm, method ="ward")
+
+#Determining the best method
+print(hc_single$ac)
+print(hc_complete$ac)
+print(hc_average$ac)
+print(hc_ward$ac)
+
+#The ward method is the best as comapred to the other methods with a value of 0.9046042
+```
+
+```{r}
+#Choosing the number of clusters
+pltree(hc_ward, cex = 0.6, hang = -1, main = "Dendrogram of agnes") 
+rect.hclust(hc_ward , k=5, border = 2:7)
+subGroup <- cutree(hc_ward, k=5)
+
+df <- as.data.frame(cbind(Cereals_norm,subGroup))
+fviz_cluster(list(data=df, cluster = subGroup))
+
+#It is concluded that 5 clusters can be selected.
+```
+
+```{r}
+#Creating Partitions
+set.seed(123)
+partition1 <- Cereals_Num [1:50,]
+partition2 <- Cereals_Num [51:74,]
+```
+
+```{r}
+#Performing Hierarchial Clustering,considering k = 5.
+Ag_single <- agnes(scale(partition1), method = "single")
+Ag_complete <- agnes(scale(partition1), method = "complete")
+Ag_average <- agnes(scale(partition1), method = "average")
+Ag_ward <- agnes(scale(partition1), method = "ward")
+
+cbind(single= Ag_single$ac , complete=Ag_complete$ac , average= Ag_average$ac , ward= Ag_ward$ac)
+
+pltree(Ag_ward, cex = 0.6, hang = -1, main = "Dendogram of Agnes Using Ward")
+rect.hclust(Ag_ward, k = 5, border = 2:7)
+cut2 <- cutree(Ag_ward, k = 5)
+```
+
+```{r}
+#Calculating the centroids.
+Result <- as.data.frame(cbind(partition1, cut2))
+Result[Result$cut2==1,]
+
+Centroid1 <- colMeans(Result[Result$cut2==1,])
+Result[Result$cut2==2,]
+
+Centroid2 <- colMeans(Result[Result$cut2==2,])
+Result[Result$cut2==3,]
+
+Centroid3 <- colMeans(Result[Result$cut2==3,])
+Result[Result$cut2==4,]
+
+Centroid4 <- colMeans(Result[Result$cut2==4,])
+
+Centroids <- rbind(Centroid1, Centroid2, Centroid3, Centroid4)
+x2 <- as.data.frame(rbind(Centroids[,-14], partition2))
+```
+
+```{r}
+#Calculating the Distance.
+Dist1 <- get_dist(x2)
+Matrix <- as.matrix(Dist1)
+data.frame <- data.frame(data=seq(1,nrow(partition2),1), Clusters = rep(0,nrow(partition2)))
+
+for(i in 1:nrow(partition2)) 
+{data.frame[i,2] <- which.min(Matrix[i+4, 1:4])}
+data.frame
+
+cbind(df$SubGroup[51:74], data.frame$Clusters)
+table(df$SubGroup[51:74] == data.frame$Clusters)
+
+#We can conclude that it is partially stable.
+```
+
+```{r}
+#Clustering Healthy Cereals.
+Healthy_Cereals <- Cereals
+Healthy_Cereals_na <- na.omit(Healthy_Cereals)
+Clusthealthy <- cbind(Healthy_Cereals_na, subGroup)
+                  
+Clusthealthy[Clusthealthy$subGroup==1,]
+Clusthealthy[Clusthealthy$subGroup==2,]
+Clusthealthy[Clusthealthy$subGroup==3,]
+Clusthealthy[Clusthealthy$subGroup==4,]
+
+```
+
+
+```{r}
+#Mean ratings to determine the best cluster.
+mean(Clusthealthy[Clusthealthy$subGroup==1,"rating"])
+mean(Clusthealthy[Clusthealthy$subGroup==2,"rating"])
+mean(Clusthealthy[Clusthealthy$subGroup==3,"rating"])
+mean(Clusthealthy[Clusthealthy$subGroup==4,"rating"])
+
+
+#It can be concluded that cluster 1 can be choosen as it has the highest value. Hence, cluster 1 can be considered as a Healthy Cluster.
+```
+
