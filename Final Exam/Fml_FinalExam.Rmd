@@ -1,0 +1,184 @@
+---
+title: "FML FINAL EXAM"
+author: "Nikitha Chigurupati"
+date: "12/18/2022"
+output: html_document
+---
+
+#Loading the Packages
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+library(gridExtra)
+library(pROC)
+library(MASS)
+library(caTools)
+library(rattle)
+library(rpart)
+library(PreProcess)
+library(gmodels)
+library(rpart.plot)
+library(caret)
+
+```
+
+#Importing the Dataset into R
+```{r}
+Breast_cancer <-read.csv("C:/Users/Nikitha/Downloads/data.csv")
+
+```
+
+
+#Checking the Dimensions of the Dataset
+```{r}
+dim(Breast_cancer)
+
+```
+
+
+#Summary of the data
+```{r}
+summary(Breast_cancer)
+```
+
+
+#Structure of the data
+```{r}
+str(Breast_cancer)
+```
+
+#Checking for Missing Values
+```{r}
+sum(is.na(Breast_cancer))
+```
+
+#Checking the missing values in each attribute
+```{r}
+colMeans(is.na(Breast_cancer))
+```
+
+#Removing the Id and X (Unnecessary Attributes)
+```{r}
+Breast_cancer$id <-NULL
+Breast_cancer$X<- NULL
+```
+
+#Rechecking again for Missing values
+```{r}
+sum(is.na(Breast_cancer))
+```
+
+#Converting Diagnosis into Factor
+```{r}
+Breast_cancer$diagnosis <- as.factor(Breast_cancer$diagnosis)
+```
+
+
+#Numeric Data
+```{r}
+Breast_cancer_Num <-(Breast_cancer[,2:31])
+head(Breast_cancer_Num)
+```
+
+#Correlation of the numeric attributes of the data
+```{r}
+Breast_cancer_Num <-cor(Breast_cancer[,2:31])
+corrplot(Breast_cancer_Num, order = "hclust", tl.cex = 0.7)
+```
+
+From the above graph it is concluded that we frequently have highly connected traits that offer duplicate information. To prevent a prediction bias for the data these features include by removing highly linked features. This demonstrates the need to remember that just because a feature is useful for predicting an outcome does not mean that it is causative; rather, it may merely be linked with other causal factors when making claims about the biological or medical significance of that feature.
+
+
+I'm maintaining the feature with the lower mean while eliminating all characteristics with correlations greater than 0.9.
+
+
+#Looking at the attributes that have a correlation of 0.9 or above.
+```{r}
+highlyCor <- colnames(Breast_cancer)[findCorrelation(Breast_cancer_Num, cutoff = 0.9, verbose = TRUE)]
+```
+
+#List of attributes which are highly Correlated
+```{r}
+highlyCor
+```
+#Scatterplot
+```{r}
+plot(Breast_cancer$perimeter_mean, Breast_cancer$area_mean)
+
+```
+There is a positive relationship between the Perimeter mean and the Area mean
+
+#Normalising the data
+```{r}
+Breast_cancer_norm <- preProcess(Breast_cancer, method = c("range"))
+Breast_cancer_norm<-predict(Breast_cancer_norm, Breast_cancer)
+summary(Breast_cancer_norm)
+```
+
+#Partiting the data to Train (80%) and Test (20%).
+```{r}
+Index <- createDataPartition(Breast_cancer_norm$diagnosis, p=0.8, list = FALSE)
+Train <- Breast_cancer_norm[Index,]
+Test <- Breast_cancer_norm[-Index,]
+```
+
+
+#Building a KNN Model 
+```{r}
+serach_grid <- expand.grid(k= 1:15)
+KNN_Model <- train(diagnosis~., data=Breast_cancer_norm, method="knn", tuneGrid = serach_grid, preProcess= 'range')
+KNN_Model
+```
+
+
+```{r}
+library(FNN)
+Train_Predictors<-Train[,2:31] 
+Test_Predictors<-Test[,2:31]
+Train_labels <-Train[,1] 
+Test_labels  <-Test[,1] 
+
+#Training a kNN Model 
+Predicted_Test_labels <-knn(Train_Predictors,Test_Predictors,cl=Train_labels, k=13 )
+head(Predicted_Test_labels)
+```
+
+```{r}
+CrossTable(x=Test_labels, y=Predicted_Test_labels, prop.chisq= FALSE)
+```
+
+#Confusion Matrix of KNN Model
+```{r}
+Pred_Breast_Cancer <- predict(KNN_Model, Test)
+confusionMatrix(Pred_Breast_Cancer, Test$diagnosis)
+```
+
+#Building the Decision Tree Model
+```{r}
+set.seed(123)
+library(rpart.plot)
+Decision_Tree_Model<- rpart(diagnosis ~ .,data=Train,method = 'class')
+rpart.plot(Decision_Tree_Model, extra = 110, main="Dendrogram of rpart")
+
+```
+
+#Predicting the probability
+```{r}
+Prob_Decision_Tree <- predict(Decision_Tree_Model, newdata = Test, type = "prob")
+```
+
+
+#Receiving Operating Characteritics Curve
+```{r}
+roc(Test$diagnosis,Prob_Decision_Tree[,2])
+```
+
+#Building the Confusion Matrix
+```{r}
+set.seed(123)
+Class_Decision_Tree <- predict(Decision_Tree_Model, newdata = Test, type = "class")
+confusionMatrix(as.factor(Class_Decision_Tree),as.factor(Test$diagnosis))
+```
+From the above model, the KNN Model is the optimal model for this dataset. It is the best model to use as it has higher accuracy than the Decision Tree Model. Hence, KNN Model is the right and optimal Model to use. 
